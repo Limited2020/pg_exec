@@ -1,0 +1,1427 @@
+Public Function PG_LocalDspWave_UpdateBy_UserDefineModule(ModuleStr As String, InModuleFlag() As Type_PartialGood_Flag, isUpdateAVS_HP As Boolean) As DSPWave
+
+    On Error GoTo errHandler
+
+    Set PG_LocalDspWave_UpdateBy_UserDefineModule = New DSPWave
+
+    Dim tmpLocalModule_Dspwave As New DSPWave
+    Dim ModuleList_Str() As String
+    Dim Module_Count As Long
+    Dim FlowModulePassFlagWriteIndex_lng As Long
+    Dim Site As Variant
+    Dim i As Long
+    Dim errmsg As String
+
+    ModuleList_Str = Split(ModuleStr, "/")
+
+    Module_Count = UBound(ModuleList_Str) + 1
+
+    tmpLocalModule_Dspwave.CreateConstant -1, Module_Count, DspLong
+
+    For Each Site In TheExec.Sites
+        '''Update DSP and AVP Module Result to Their Dspwaves for PG bin out rule judge
+        For i = 0 To Module_Count - 1
+            If FindModuleIndex_Dct.Exists(LCase(ModuleList_Str(i))) = True Then
+            'Get the reference order in FlowModulePassFlag by reference to the module name in the global const module string
+                If isUpdateAVS_HP = False Then
+                    FlowModulePassFlagWriteIndex_lng = FindModuleIndex_Dct.Item(LCase(ModuleList_Str(i)))
+                Else
+                    FlowModulePassFlagWriteIndex_lng = FindModuleIndex_Dct.Item(LCase(ModuleList_Str(i))) + glb_Module_Count
+                End If
+                tmpLocalModule_Dspwave.Element(i) = InModuleFlag(FlowModulePassFlagWriteIndex_lng).iValue
+            Else
+                errmsg = "Can not find this module in user define module list,please check!"
+                GoTo errHandler
+            End If
+        Next i
+
+       PG_LocalDspWave_UpdateBy_UserDefineModule = tmpLocalModule_Dspwave.Copy
+
+    Next Site
+
+Exit Function
+errHandler:
+    TheExec.ErrorLogMessage ("*E* PG.PG_LocalDspWave_UpdateBy_UserDefineModule: " + errmsg)
+    If AbortTest Then Exit Function Else Resume Next
+End Function
+Public Function PG_SetBin_CP() As Long
+
+    On Error GoTo errHandler
+
+    Dim DSP0_RdFlag As New SiteDouble
+    Dim DSP1_RdFlag As New SiteDouble
+    Dim DSP2_RdFlag As New SiteDouble
+    Dim DSP3_RdFlag As New SiteDouble
+    Dim FFT0_RdFlag As New SiteDouble
+    Dim FFT1_RdFlag As New SiteDouble
+    Dim SAMP0_RdFlag As New SiteDouble
+    Dim SAMP1_RdFlag As New SiteDouble
+    Dim Site As Variant
+
+    For Each Site In TheExec.Sites
+        DSP0_RdFlag(Site) = HiEfuse.GET_MULT_EFUSE_ITEM_CODE_RD("DSP0_PASS_FLAG_LT_CPB", 0, Site)
+        DSP1_RdFlag(Site) = HiEfuse.GET_MULT_EFUSE_ITEM_CODE_RD("DSP1_PASS_FLAG_LT_CPB", 0, Site)
+        DSP2_RdFlag(Site) = HiEfuse.GET_MULT_EFUSE_ITEM_CODE_RD("DSP2_PASS_FLAG_LT_CPB", 0, Site)
+        DSP3_RdFlag(Site) = HiEfuse.GET_MULT_EFUSE_ITEM_CODE_RD("DSP3_PASS_FLAG_LT_CPB", 0, Site)
+        FFT0_RdFlag(Site) = HiEfuse.GET_MULT_EFUSE_ITEM_CODE_RD("FFT0_PASS_FLAG_LT_CPB", 0, Site)
+        FFT1_RdFlag(Site) = HiEfuse.GET_MULT_EFUSE_ITEM_CODE_RD("FFT1_PASS_FLAG_LT_CPB", 0, Site)
+        SAMP0_RdFlag(Site) = HiEfuse.GET_MULT_EFUSE_ITEM_CODE_RD("SAMP0_PASS_FLAG_LT_CPB", 0, Site)
+        SAMP1_RdFlag(Site) = HiEfuse.GET_MULT_EFUSE_ITEM_CODE_RD("SAMP1_PASS_FLAG_LT_CPB", 0, Site)
+
+        TheExec.Flow.TestLimit ResultVal:=DSP0_RdFlag, lowVal:=0, hiVal:=1, PinName:="DSP0", ForceResults:=tlForceNone, TName:="ModuleFlagRead"
+        TheExec.Flow.TestLimit ResultVal:=DSP1_RdFlag, lowVal:=0, hiVal:=1, PinName:="DSP1", ForceResults:=tlForceNone, TName:="ModuleFlagRead"
+        TheExec.Flow.TestLimit ResultVal:=DSP2_RdFlag, lowVal:=0, hiVal:=1, PinName:="DSP2", ForceResults:=tlForceNone, TName:="ModuleFlagRead"
+        TheExec.Flow.TestLimit ResultVal:=DSP3_RdFlag, lowVal:=0, hiVal:=1, PinName:="DSP3", ForceResults:=tlForceNone, TName:="ModuleFlagRead"
+        TheExec.Flow.TestLimit ResultVal:=FFT0_RdFlag, lowVal:=0, hiVal:=1, PinName:="FFT0", ForceResults:=tlForceNone, TName:="ModuleFlagRead"
+        TheExec.Flow.TestLimit ResultVal:=FFT1_RdFlag, lowVal:=0, hiVal:=1, PinName:="FFT1", ForceResults:=tlForceNone, TName:="ModuleFlagRead"
+        TheExec.Flow.TestLimit ResultVal:=SAMP0_RdFlag, lowVal:=0, hiVal:=1, PinName:="SAMP0", ForceResults:=tlForceNone, TName:="ModuleFlagRead"
+        TheExec.Flow.TestLimit ResultVal:=SAMP1_RdFlag, lowVal:=0, hiVal:=1, PinName:="SAMP1", ForceResults:=tlForceNone, TName:="ModuleFlagRead"
+
+        If TheExec.Sites(Site).FirstBinNumber = -1 And TheExec.Sites(Site).FirstSortNumber = -1 Then
+
+            If DSP0_RdFlag = 1 And DSP1_RdFlag = 1 And DSP2_RdFlag = 1 And DSP3_RdFlag = 1 And FFT0_RdFlag = 1 And FFT1_RdFlag = 1 And SAMP0_RdFlag = 1 And SAMP1_RdFlag = 1 Then
+                '''Full Good
+                If glb_PG_DebugMode = True Then
+                    TheExec.Datalog.WriteComment "Site:" & Site & "_This Chip is Full Good"
+                End If
+                TheExec.Sites(Site).BinNumber = 1
+                TheExec.Sites(Site).SortNumber = 1
+                TheExec.Sites(Site).Result = tlResultPass
+            ElseIf (DSP0_RdFlag + DSP1_RdFlag + DSP2_RdFlag + DSP3_RdFlag) >= 3 And (FFT0_RdFlag + FFT1_RdFlag) >= 1 And (SAMP0_RdFlag + SAMP1_RdFlag) >= 1 Then
+                ''PG1
+                If glb_PG_DebugMode = True Then
+                    TheExec.Datalog.WriteComment "Site:" & Site & "_This Chip is PG1"
+                End If
+                TheExec.Sites(Site).BinNumber = 8
+                TheExec.Sites(Site).SortNumber = 8201
+                TheExec.Sites(Site).Result = tlResultPass
+            Else
+                ''Fail Die
+                If glb_PG_DebugMode = True Then
+                    TheExec.Datalog.WriteComment "Site:" & Site & "_This Chip is Fail Die"
+                End If
+                TheExec.Sites(Site).BinNumber = 6
+                TheExec.Sites(Site).SortNumber = 6999
+                TheExec.Sites(Site).Result = tlResultFail
+            End If
+        Else
+             If glb_PG_DebugMode = True Then
+                TheExec.Datalog.WriteComment "Site:" & Site & "_This Chip has some other fail before"
+             End If
+        End If
+
+
+    Next Site
+
+    Exit Function
+errHandler:
+    If AbortTest Then Exit Function Else Resume Next
+End Function
+Public Function PG_SetBin_FT() As Long
+
+    On Error GoTo errHandler
+
+    Dim PWR_GRD_RD_Sdbl As New SiteDouble
+    Dim DSP0_RdFlag As New SiteDouble
+    Dim DSP1_RdFlag As New SiteDouble
+    Dim DSP2_RdFlag As New SiteDouble
+    Dim DSP3_RdFlag As New SiteDouble
+    Dim FFT0_RdFlag As New SiteDouble
+    Dim FFT1_RdFlag As New SiteDouble
+    Dim SAMP0_RdFlag As New SiteDouble
+    Dim SAMP1_RdFlag As New SiteDouble
+    Dim Site As Variant
+    For Each Site In TheExec.Sites
+        PWR_GRD_RD_Sdbl(Site) = HiEfuse.GET_MULT_EFUSE_ITEM_CODE_RD("PWR_GRD", 0, Site)
+        DSP0_RdFlag(Site) = HiEfuse.GET_MULT_EFUSE_ITEM_CODE_RD("DSPS0_PAGD_PASS_FLAG", 0, Site)
+        DSP1_RdFlag(Site) = HiEfuse.GET_MULT_EFUSE_ITEM_CODE_RD("DSPS1_PAGD_PASS_FLAG", 0, Site)
+        DSP2_RdFlag(Site) = HiEfuse.GET_MULT_EFUSE_ITEM_CODE_RD("DSPS2_PAGD_PASS_FLAG", 0, Site)
+        DSP3_RdFlag(Site) = HiEfuse.GET_MULT_EFUSE_ITEM_CODE_RD("DSPS3_PAGD_PASS_FLAG", 0, Site)
+        FFT0_RdFlag(Site) = HiEfuse.GET_MULT_EFUSE_ITEM_CODE_RD("FFT0_PAGD_PASS_FLAG", 0, Site)
+        FFT1_RdFlag(Site) = HiEfuse.GET_MULT_EFUSE_ITEM_CODE_RD("FFT1_PAGD_PASS_FLAG", 0, Site)
+        SAMP0_RdFlag(Site) = HiEfuse.GET_MULT_EFUSE_ITEM_CODE_RD("SAMPLE0_PAGD_PASS_FLAG", 0, Site)
+        SAMP1_RdFlag(Site) = HiEfuse.GET_MULT_EFUSE_ITEM_CODE_RD("SAMPLE1_PAGD_PASS_FLAG", 0, Site)
+
+        TheExec.Flow.TestLimit ResultVal:=DSP0_RdFlag, lowVal:=0, hiVal:=1, PinName:="DSP0", ForceResults:=tlForceNone, TName:="ModuleFlagRead"
+        TheExec.Flow.TestLimit ResultVal:=DSP1_RdFlag, lowVal:=0, hiVal:=1, PinName:="DSP1", ForceResults:=tlForceNone, TName:="ModuleFlagRead"
+        TheExec.Flow.TestLimit ResultVal:=DSP2_RdFlag, lowVal:=0, hiVal:=1, PinName:="DSP2", ForceResults:=tlForceNone, TName:="ModuleFlagRead"
+        TheExec.Flow.TestLimit ResultVal:=DSP3_RdFlag, lowVal:=0, hiVal:=1, PinName:="DSP3", ForceResults:=tlForceNone, TName:="ModuleFlagRead"
+        TheExec.Flow.TestLimit ResultVal:=FFT0_RdFlag, lowVal:=0, hiVal:=1, PinName:="FFT0", ForceResults:=tlForceNone, TName:="ModuleFlagRead"
+        TheExec.Flow.TestLimit ResultVal:=FFT1_RdFlag, lowVal:=0, hiVal:=1, PinName:="FFT1", ForceResults:=tlForceNone, TName:="ModuleFlagRead"
+        TheExec.Flow.TestLimit ResultVal:=SAMP0_RdFlag, lowVal:=0, hiVal:=1, PinName:="SAMP0", ForceResults:=tlForceNone, TName:="ModuleFlagRead"
+        TheExec.Flow.TestLimit ResultVal:=SAMP1_RdFlag, lowVal:=0, hiVal:=1, PinName:="SAMP1", ForceResults:=tlForceNone, TName:="ModuleFlagRead"
+
+
+        If TheExec.Sites(Site).FirstBinNumber = -1 And TheExec.Sites(Site).FirstSortNumber = -1 Then
+
+            If (DSP0_RdFlag + DSP1_RdFlag + DSP2_RdFlag + DSP3_RdFlag) >= 3 And (FFT0_RdFlag + FFT1_RdFlag) >= 1 And (SAMP0_RdFlag + SAMP1_RdFlag) >= 1 Then
+
+                If PWR_GRD_RD_Sdbl = 1 Then
+                    ''LP Full Good
+                    TheExec.Sites(Site).BinNumber = 7
+                    TheExec.Sites(Site).SortNumber = 1201
+                    TheExec.Sites(Site).Result = tlResultPass
+                ElseIf PWR_GRD_RD_Sdbl = 2 Then
+                    ''HP Full Good
+                    TheExec.Sites(Site).BinNumber = 1
+                    TheExec.Sites(Site).SortNumber = 1
+                    TheExec.Sites(Site).Result = tlResultPass
+                ElseIf PWR_GRD_RD_Sdbl = 3 Then
+                    ''LP Partial Good
+                    TheExec.Sites(Site).BinNumber = 8
+                    TheExec.Sites(Site).SortNumber = 8201
+                    TheExec.Sites(Site).Result = tlResultPass
+                Else
+                    ''fail case, is not supposed to appear
+                    TheExec.Sites(Site).BinNumber = 6
+                    TheExec.Sites(Site).SortNumber = 6999
+                    TheExec.Sites(Site).Result = tlResultFail
+                End If
+
+            Else
+                ''fail case, is not supposed to appear
+                TheExec.Sites(Site).BinNumber = 6
+                TheExec.Sites(Site).SortNumber = 6997
+                TheExec.Sites(Site).Result = tlResultFail
+            End If
+
+        End If
+
+        TheExec.Flow.TestLimit ResultVal:=PWR_GRD_RD_Sdbl, lowVal:=1, hiVal:=3, PinName:="PWR_GRD_RD", ForceResults:=tlForceNone, TName:="PWR_GRD_RD_Judge"
+    Next Site
+
+    Exit Function
+errHandler:
+    If AbortTest Then Exit Function Else Resume Next
+End Function
+
+''=======================================================================
+''   This function help to initialize PG_Infor from PG_Info worksheet
+''   Exceute when pgm validate
+''=======================================================================
+Public Function Initialize_PG_Info() As Long
+    On Error GoTo errHandler
+
+    Dim mSheet As Worksheet
+    Set mSheet = ThisWorkbook.Worksheets("PG_Info_Sheet")
+
+    Dim Total_Count As Long  'Total count of pg info patterns, count until the end of first column is ""
+    Dim i As Long, j As Long, Idx As Long, Test_Index As Long
+
+    '******************************************
+    'Step1: Get total count of PG patters
+    '******************************************
+    For i = 1 To 9999    '9999 can change in other projects
+        If mSheet.Cells(i + 1, 1) <> "" Then
+            Total_Count = Total_Count + 1
+        Else
+            Exit For
+        End If
+    Next
+
+    '******************************************
+    'Step2: Initilize all PG information
+    'Step2.1: Initilize Global dictionary to quick find pattern index
+    '******************************************
+
+    FindPatternIndex_Dct.RemoveAll
+    With PG_Info
+        ReDim .WGL_Name(1 To Total_Count)
+        ReDim .PG_Type(1 To Total_Count)
+        ReDim .IncludeModule(1 To Total_Count)
+        ReDim .Pin_Cycle_Array(1 To Total_Count)
+
+        For i = 1 To Total_Count
+            .WGL_Name(i) = mSheet.Cells(i + 1, 1)
+            .PG_Type(i) = mSheet.Cells(i + 1, 2)
+            .IncludeModule(i) = mSheet.Cells(i + 1, 3)
+            .Pin_Cycle_Array(i) = mSheet.Cells(i + 1, 4)
+
+            FindPatternIndex_Dct.add LCase(.WGL_Name(i)), i
+
+        Next i
+    End With
+
+    ''Debug Function to print all key and item in the dictionary
+    'Print_Dictionary FindPatternIndex_Dct
+
+    '******************************************
+    'Step3:PG_Info PreCheck
+    '******************************************
+
+    For i = 1 To Total_Count
+        If mSheet.Cells(i + 1, 1) = "" Or mSheet.Cells(i + 1, 2) = "" Or mSheet.Cells(i + 1, 3) = "" Then
+            TheExec.AddOutput "PG_Info_Sheet has empty cell at row " & i + 1 & " , Please check!", vbRed
+        End If
+    Next i
+
+
+    '******************************************
+    'Step4:Initilize Global dictionary to quick find module index
+    '******************************************
+    Dim ModuleList_Str() As String
+    ModuleList_Str = Split(USER_DEFINE_MODULENAME, "/")
+    glb_Module_Count = UBound(ModuleList_Str) + 1
+
+    FindModuleIndex_Dct.RemoveAll
+
+    For i = 0 To UBound(ModuleList_Str)
+        FindModuleIndex_Dct.add LCase(ModuleList_Str(i)), i
+    Next i
+    ''Debug Function to print all key and item in the dictionary
+    'Print_Dictionary FindModuleIndex_Dct
+
+    glb_PG_DebugMode = True
+    glb_IsPGInfoLoaded_Bool = True  'PGInfoSheet success loaded!
+
+    Exit Function
+errHandler:
+    TheExec.AddOutput "Error when loading PG_Info_Sheet, Please Check!", vbRed
+    HandleExecIPError "Initialize_PG_Info"
+    If AbortTest Then Exit Function Else Resume Next
+
+End Function
+
+
+
+
+Public Function PG_PrePatIPF_ByPins(argc As Long, argv() As String) As Long
+    On Error GoTo errHandler
+
+    Dim i As Long
+    Dim i_LastBurst_str As String
+    Dim i_IsBurst_bool As Boolean
+    Dim tmpPGPins As String
+    Dim tmpPGModules As String
+
+    Call TheHdw.Digital.Patgen.ReadLastStart(i_LastBurst_str, i_IsBurst_bool, "")
+
+    Exit Function
+errHandler:
+    TheExec.ErrorLogMessage ("*E* PG.PrePatIPF: " + errmsg)
+    If AbortTest Then Exit Function Else Resume Next
+End Function
+
+Public Function PG_PostPatIPF_ByPins(argc As Long, argv() As String) As Long
+
+    On Error GoTo errHandler
+
+'*************************************************************************************************
+'*********Step1:Get Module Name List and find pattern in PG_Info Sheet****************************
+'*************************************************************************************************
+    Dim i_LastBurst_str As String
+    Dim i_IsBurst_bool As Boolean
+    Dim errmsg As String
+    Dim PatternName_str As String
+    Dim PG_Type_Str As String
+    Dim tempSortNumber_lng As Long
+    Dim FuncResult_API_SBool As New SiteBoolean
+
+    For Each Site In TheExec.Sites
+        PGCaredModule_Result_SBool = True    '''inital PGCaredModule_Result value
+        tempSortNumber_lng = TheExec.Sites(Site).TestNumber / 10000
+    Next
+    Call TheHdw.Digital.Patgen.ReadLastStart(i_LastBurst_str, i_IsBurst_bool, "")
+
+    If i_IsBurst_bool = True Then
+        PatternName_str = i_LastBurst_str   ''burst yes means STUCK/TRANS, which is init+body structure,Use Patset to look up in PG_Info
+    Else
+        PatternName_str = WGLName_Conversion_CHAIN(i_LastBurst_str)   ''burst no means CHAIN, use wgl name to look up in PG_Info
+    End If
+
+
+    Dim IsExist_bool As Boolean                'Check if pattern name exist in FindPatternIndex_Dct dictionary
+    Dim IncludeModule_Str As String            'Included Module String in excel work sheet
+    Dim IncludeModuleList_Str() As String      'Included Module String delimiter by "/"
+    Dim FailPin_Str As String                  'Fail Pin String in excel work sheet
+    Dim FailPinAarray_Str() As String          'Fail Pin String delimiter by "/", for each Include module
+    Dim PatternIndex_lng As Long               'Pattern index in PG_Info Structure
+
+    IsExist_bool = FindPatternIndex_Dct.Exists(LCase(PatternName_str))
+    If IsExist_bool = True Then
+        PatternIndex_lng = FindPatternIndex_Dct.Item(LCase(PatternName_str))
+        IncludeModule_Str = PG_Info.IncludeModule(PatternIndex_lng)
+        FailPin_Str = PG_Info.Pin_Cycle_Array(PatternIndex_lng)
+        PG_Type_Str = PG_Info.PG_Type(PatternIndex_lng)
+    Else
+        errmsg = PatternName_str & "not exist in the dictionary, Please Check!"
+        GoTo errHandler
+    End If
+
+    If LCase(PG_Type_Str) <> "bypin" Then
+        errmsg = PatternName_str & "is not byPin type.Please check instance!"
+        GoTo errHandler
+    End If
+
+    If InStr(1, FailPin_Str, "/") > 0 Then
+        FailPinAarray_Str = Split(FailPin_Str, "/")
+    Else
+        ReDim FailPinAarray_Str(0)
+        FailPinAarray_Str(0) = FailPin_Str
+    End If
+
+
+    If InStr(1, IncludeModule_Str, "/") > 0 Then
+        IncludeModuleList_Str = Split(IncludeModule_Str, "/")
+    Else
+        ReDim IncludeModuleList_Str(0)
+        IncludeModuleList_Str(0) = IncludeModule_Str
+    End If
+
+    If UBound(IncludeModuleList_Str) <> UBound(FailPinAarray_Str) Then
+        errmsg = PatternName_str & "Module count not equal to PinArray count, Please Check PG_Info Sheet!"
+        GoTo errHandler
+    End If
+
+
+'*************************************************************************************************
+'*********Step2:Get Fail Info****************************
+'*************************************************************************************************
+
+
+'Use dictionary array to store fail pins
+    Dim i_SiteFailPin_DCT() As New Dictionary
+    ReDim i_SiteFailPin_DCT(TheExec.Sites.Existing.Count - 1) As New Dictionary
+    Dim ThisSiteFail_SBool As New SiteBoolean
+    Dim PatternFailPinsList() As String
+    Dim i As Long
+    'Put all fail pins in dictionary,each fail pin is a key, no need to care about item
+
+    For Each Site In TheExec.Sites
+        PatternFailPinsList = TheHdw.Digital.FailedPins(Site)
+        If UBound(PatternFailPinsList) = -1 Then
+            ThisSiteFail_SBool = False '''means this site pass for this pattern
+        Else
+            ThisSiteFail_SBool = True  '''means this site fail for this pattern
+            For i = 0 To UBound(PatternFailPinsList)
+                i_SiteFailPin_DCT(Site).add LCase(PatternFailPinsList(i)), True
+            Next i
+        End If
+    Next Site
+
+
+
+'*************************************************************************************************
+'*****Step3:Check if pin list in PG_Info Sheet exist in fail pin and update to dspwave******
+'*************************************************************************************************
+    Dim Local_DSPwave As New DSPWave               'Local dspwave to store PG data, can be used for AVS/NONE AVS case
+    Dim LoaclDspwaveWriteIndex_lng As Long
+    Dim j As Long
+    Dim EachModuleFail_Sbool As New SiteBoolean
+    Dim OtherPartFail_Sbool As New SiteBoolean
+    Dim PinFailResult_bool() As Boolean
+    Dim tempFailPinlist() As String
+    Dim FuncResult_SBool As New SiteBoolean
+
+    Local_DSPwave.CreateConstant -1, (glb_Module_Count + 2), DspLong
+
+'*************************************************************************************************
+'*****Step3.1:Search result in DCT,and update PG Module result to local dspwave*******************
+'*************************************************************************************************
+    For i = 0 To UBound(IncludeModuleList_Str)
+        If FindModuleIndex_Dct.Exists(LCase(IncludeModuleList_Str(i))) = True Then
+            'Get the reference order in Global dspwave by reference to the module name in the global const module string
+            LoaclDspwaveWriteIndex_lng = FindModuleIndex_Dct.Item(LCase(IncludeModuleList_Str(i)))
+            PinFailResult_bool = TheHdw.Digital.Pins(FailPinAarray_Str(i)).FailedPerSiteArray
+                For Each Site In TheExec.Sites
+                    If PinFailResult_bool(Site) = True Then   '''Means this module fail for this site
+                        Local_DSPwave.Element(LoaclDspwaveWriteIndex_lng) = 0  'Update per module result to local Dspwave
+
+                    ElseIf PinFailResult_bool(Site) = False Then   '''Means this module pass for this site
+                        Local_DSPwave.Element(LoaclDspwaveWriteIndex_lng) = 1  'Update per module result to local Dspwave
+                    End If
+
+                    tempFailPinlist = Split(FailPinAarray_Str(i), ",")
+                    For j = 0 To UBound(tempFailPinlist)
+                        If i_SiteFailPin_DCT(Site).Exists(LCase(tempFailPinlist(j))) Then
+                            i_SiteFailPin_DCT(Site).Remove (LCase(tempFailPinlist(j)))
+                        End If
+                    Next j
+
+                Next Site
+        Else
+            errmsg = "Can not find " & LCase(IncludeModuleList_Str(i)) & "in user define module list,please check!"
+            GoTo errHandler
+        End If
+    Next i
+
+'*************************************************************************************************
+'*****Step3.2:Update Other Module result and test number to local dspwave*************************
+'*************************************************************************************************
+
+    For Each Site In TheExec.Sites
+        If i_SiteFailPin_DCT(Site).Count = 0 Then
+        'No fail pins except pinlist in PG_Info Sheet, means other part pass
+            OtherPartFail_Sbool(Site) = False
+                Local_DSPwave.Element(glb_Module_Count) = 1  '''Update other part result to local Dspwave
+                Local_DSPwave.Element(glb_Module_Count + 1) = tempSortNumber_lng
+
+        Else
+        'other fail pins except pinlist in PG_Info Sheet, means other part fail
+            OtherPartFail_Sbool(Site) = True
+                Local_DSPwave.Element(glb_Module_Count) = 0  '''Update other part result to local Dspwave
+                Local_DSPwave.Element(glb_Module_Count + 1) = tempSortNumber_lng
+
+        '''if None-AVS other part fail,should bin out here
+            If AVS_Enable = False Then
+                TheExec.Sites(Site).BinNumber = Floor(tempSortNumber_lng / 1000)
+                TheExec.Sites(Site).SortNumber = tempSortNumber_lng
+                TheExec.Sites(Site).Result = tlResultFail
+            End If
+        End If
+    Next Site
+
+
+'*************************************************************************************************
+'****Step3.3:Resotre Bin Number when first fail module appear*************************************
+'*************************************************************************************************
+    FuncResult_API_SBool = TheHdw.Digital.Patgen.PatternBurstPassedPerSite
+    For Each Site In TheExec.Sites
+        If glb_PGFirstFail_Flag_SBool = False Then    '''means PG Module haven't fail yet
+            If Local_DSPwave.Select(0, 1, glb_Module_Count + 1).FindIndices(EqualTo, 0).SampleSize > 0 Then ''means more than one module failed
+                If FuncResult_API_SBool = False Then        ''double check if pattern failed
+                    glb_PGFirstFail_Flag_SBool = True
+                    glb_PGFisrtFail_SortNum_SLng = tempSortNumber_lng
+                    glb_PGFisrtFail_BinNum_SLng = Floor(tempSortNumber_lng / 1000)
+                Else
+                    errmsg = "Warning!!The pattern is supposed to fail here but API result is pass!Need to Check Code"
+                    GoTo errHandler
+                End If
+            End If
+        End If
+    Next Site
+
+''*************************************************************************************************
+''*****Step3.3:Judge Whether Bin Out Through PG Rules and Update Bin Number if needed**************
+''*************************************************************************************************
+'    Dim DSPModuleList_Str() As String
+'    Dim AVPModuleList_Str() As String
+'    Dim DSPSCluster_Count As Long
+'    Dim AVPSCluster_Count As Long
+'
+'    For Each Site In TheExec.Sites
+'        If TheExec.Sites(Site).FirstBinNumber = -1 And TheExec.Sites(Site).BinNumber = -1 and _
+'             TheExec.Sites(Site).FirstSortNumber = -1 And TheExec.Sites(Site).SortNumber = -1 Then
+'
+'                DSPModuleList_Str = Split(USER_DEFINE_DSPSCluster, "/")
+'                AVPModuleList_Str = Split(USER_DEFINE_AVPSCluster, "/")
+'                DSPSCluster_Count = UBound(DSPModuleList_Str) + 1
+'                AVPSCluster_Count = UBound(AVPModuleList_Str) + 1
+'                Dim LocalDSPS_Dspwave As New DSPWave
+'                Dim LocalAVPS_Dspwave As New DSPWave
+'
+'                LocalDSPS_Dspwave.CreateConstant -1, DSPSCluster_Count, DspLong
+'                LocalAVPS_Dspwave.CreateConstant -1, AVPSCluster_Count, DspLong
+'
+'                '''Update DSP and AVP Module Result to Their Dspwaves for PG bin out rule judge
+'                For i = 0 To DSPSCluster_Count - 1
+'                    If FindModuleIndex_Dct.Exists(LCase(DSPModuleList_Str(i))) = True Then
+'                    'Get the reference order in Global dspwave by reference to the module name in the global const module string
+'                        LoaclDspwaveWriteIndex_lng = FindModuleIndex_Dct.Item(LCase(DSPModuleList_Str(i)))
+'                        LocalDSPS_Dspwave.Element(i) = Local_DSPwave.Element(LoaclDspwaveWriteIndex_lng)
+'                    Else
+'                        errMsg = "Can not find this DSP module in user define module list,please check!"
+'                        GoTo errHandler
+'                    End If
+'                Next i
+'
+'                For i = 0 To AVPSCluster_Count - 1
+'                    If FindModuleIndex_Dct.Exists(LCase(AVPModuleList_Str(i))) = True Then
+'                    'Get the reference order in Global dspwave by reference to the module name in the global const module string
+'                        LoaclDspwaveWriteIndex_lng = FindModuleIndex_Dct.Item(LCase(AVPModuleList_Str(i)))
+'                        LocalAVPS_Dspwave.Element(i) = Local_DSPwave.Element(LoaclDspwaveWriteIndex_lng)
+'                    Else
+'                        errMsg = "Can not find this DSP module in user define module list,please check!"
+'                        GoTo errHandler
+'                    End If
+'                Next i
+'                If LocalDSPS_Dspwave.FindIndices(EqualTo, 0).SampleSize > 1 Or LocalAVPS_Dspwave.FindIndices(EqualTo, 0).SampleSize > 1 Or OtherPartFail_Sbool(Site) = True Then
+'                    TheExec.Sites(Site).BinNumber = 4
+'                    TheExec.Sites(Site).SortNumber = glb_PGFisrtFail_BinNum_SLng
+'                End If
+'            End If
+'        End If
+'    Next Site
+
+
+'*************************************************************************************************
+'*****Step3.4:Calculate cared module result for each PG test**************************************
+'*************************************************************************************************
+'''    For Each Site In TheExec.Sites
+'''        For i = 0 To UBound(IncludeModuleList_Str)
+'''            LoaclDspwaveWriteIndex_lng = FindModuleIndex_Dct.Item(LCase(IncludeModuleList_Str(i)))
+'''            If (FlowModuleFlag(FindModuleIndex_Dct.Item(LCase(IncludeModuleList_Str(i)))).iValue = 1) And (Local_DSPwave.Element(LoaclDspwaveWriteIndex_lng) = 1) Then
+'''                PGCaredModule_Result_SBool = PGCaredModule_Result_SBool And True ''Update CareModuleResult except for other part
+'''            ElseIf (FlowModuleFlag(FindModuleIndex_Dct.Item(LCase(IncludeModuleList_Str(i)))).iValue = 1) And (Local_DSPwave.Element(LoaclDspwaveWriteIndex_lng) = 0) Then
+'''                PGCaredModule_Result_SBool = PGCaredModule_Result_SBool And False ''Update CareModuleResult except for other part
+'''            End If
+'''        Next i
+'''
+'''        If OtherPartFail_Sbool = False Then
+'''            PGCaredModule_Result_SBool = PGCaredModule_Result_SBool And True ''Update CareModuleResult for other part
+'''        Else
+'''            PGCaredModule_Result_SBool = PGCaredModule_Result_SBool And False ''Update CareModuleResult for other part
+'''        End If
+'''    Next Site
+'''
+'*************************************************************************************************
+'*****Step3.5:Print Datalog and update global dspwave*********************************************
+'*************************************************************************************************
+    ''''''Log for Function Result and CaredModule Result
+    FuncResult_SBool = TheHdw.Digital.Patgen.PatternBurstPassedPerSite
+
+    Dim ModuleList_Str() As String
+    ModuleList_Str = Split(USER_DEFINE_MODULENAME, "/")
+    Dim tempDSPwave As New DSPWave
+    tempDSPwave.CreateConstant -1, (glb_Module_Count + 2), DspLong
+
+    'Pass each pattern result to global dspwave and judge pass fail for other part
+    For Each Site In TheExec.Sites
+        TheExec.Flow.TestLimit ResultVal:=FuncResult_SBool, lowVal:=-1, hiVal:=0, TName:="FuncResult"
+        'TheExec.Flow.TestLimit ResultVal:=PGCaredModule_Result_SBool, lowVal:=-1, hiVal:=0, TName:="CaredModuleResult"
+
+        If AVS_Enable = True Then   ''Print Local result of AVS PG result Dspwave
+            If AVS_LP_Enable_SBool = True Then  ''Print Local result of AVS LP PG result Dspwave
+                For i = 0 To UBound(ModuleList_Str)
+                    TheExec.Flow.TestLimit ResultVal:=Local_DSPwave.Element(i), lowVal:=-1, hiVal:=1, PinName:=ModuleList_Str(i), ForceResults:=tlForceNone, TName:="PG_Module_Part_Result_LP"
+                Next i
+                TheExec.Flow.TestLimit ResultVal:=Local_DSPwave.Element(glb_Module_Count), lowVal:=1, hiVal:=1, PinName:="Other", ForceResults:=tlForceNone, TName:="PG_Module_Part_Result_LP"
+                glb_PG_FlowResult_AVS_Dspwave = glb_PG_FlowResult_AVS_Dspwave.Concatenate(Local_DSPwave)
+                glb_PG_FlowResult_AVS_Dspwave = glb_PG_FlowResult_AVS_Dspwave.Concatenate(tempDSPwave)
+            ElseIf AVS_HP_Enable_SBool = True Then  ''Print Local result of AVS HP PG result Dspwave
+                For i = 0 To UBound(ModuleList_Str)
+                    TheExec.Flow.TestLimit ResultVal:=Local_DSPwave.Element(i), lowVal:=-1, hiVal:=1, PinName:=ModuleList_Str(i), ForceResults:=tlForceNone, TName:="PG_Module_Part_Result_HP"
+                Next i
+                TheExec.Flow.TestLimit ResultVal:=Local_DSPwave.Element(glb_Module_Count), lowVal:=1, hiVal:=1, PinName:="Other", ForceResults:=tlForceNone, TName:="PG_Module_Part_Result_HP"
+                Dim tempDSPwaveSampleSize As Long
+                tempDSPwaveSampleSize = glb_PG_FlowResult_AVS_Dspwave.SampleSize
+                glb_PG_FlowResult_AVS_Dspwave = glb_PG_FlowResult_AVS_Dspwave.Select(0, 1, tempDSPwaveSampleSize - glb_Module_Count - 2).Concatenate(Local_DSPwave)
+            End If
+        ElseIf AVS_Enable = False Then  ''Print Local result of normal PG result Dspwave
+            For i = 0 To UBound(ModuleList_Str)
+                TheExec.Flow.TestLimit ResultVal:=Local_DSPwave.Element(i), lowVal:=-1, hiVal:=1, PinName:=ModuleList_Str(i), ForceResults:=tlForceNone, TName:="PG_Module_Part_Result"
+            Next i
+            TheExec.Flow.TestLimit ResultVal:=Local_DSPwave.Element(glb_Module_Count), lowVal:=1, hiVal:=1, PinName:="Other", ForceResults:=tlForceNone, TName:="PG_Module_Part_Result"
+            glb_PG_FlowResult_Dspwave = glb_PG_FlowResult_Dspwave.Concatenate(Local_DSPwave)
+        End If
+    Next Site
+
+ 'Add debug mode to print all fail pins for each site, for further use
+    If glb_PG_DebugMode = True Then
+        For Each Site In TheExec.Sites
+            PatternFailPinsList = TheHdw.Digital.FailedPins(Site)
+            If UBound(PatternFailPinsList) <> -1 Then
+                TheExec.Datalog.WriteComment "Site:" & Site & "_" & PatternName_str & "_FailPins as followed:"
+                For i = 0 To UBound(PatternFailPinsList)
+                    TheExec.Datalog.WriteComment PatternFailPinsList(i)
+                Next i
+            Else
+                TheExec.Datalog.WriteComment "Site:" & Site & "_" & PatternName_str & "_Pattern pass for this site"
+            End If
+        Next Site
+    End If
+
+    Call PG_CalcModuleFailCountAfterDVS(Local_DSPwave, tempSortNumber_lng) '''add for CP DVS Flow bin number collect
+
+    Exit Function
+errHandler:
+    TheExec.ErrorLogMessage ("*E* PG.PostPatIPF: " + errmsg)
+    If AbortTest Then Exit Function Else Resume Next
+End Function
+Public Function PG_PostPatIPF_ByPattern(argc As Long, argv() As String) As Long
+
+    On Error GoTo errHandler
+'*************************************************************************************************
+'*********Step1:Get Module Name List and find pattern in PG_Info Sheet****************************
+'*************************************************************************************************
+    Dim i_LastBurst_str As String
+    Dim i_IsBurst_bool As Boolean
+    Dim errmsg As String
+    Dim PatternName_str As String
+    Dim PG_Type_Str As String
+    Dim tempSortNumber_lng As Long
+    Dim FuncResult_API_SBool As New SiteBoolean
+
+    For Each Site In TheExec.Sites
+        PGCaredModule_Result_SBool = True    '''inital PGCaredModule_Result value
+        tempSortNumber_lng = TheExec.Sites(Site).TestNumber / 10000
+    Next
+    Call TheHdw.Digital.Patgen.ReadLastStart(i_LastBurst_str, i_IsBurst_bool, "")
+
+
+    ''Do not support multi pattern burst no
+    If i_IsBurst_bool = True Then
+        PatternName_str = i_LastBurst_str   ''burst yes means STUCK/TRANS, which is init+body structure,Use Patset to look up in PG_Info
+    Else
+        PatternName_str = WGLName_Conversion(i_LastBurst_str)   ''burst no means CHAIN or MBIST, use wgl name to look up in PG_Info
+    End If
+
+
+    Dim IsExist_bool As Boolean                'Check if pattern name exist in FindPatternIndex_Dct dictionary
+    Dim IncludeModule_Str As String            'Included Module String in excel work sheet
+    Dim IncludeModuleList_Str() As String      'Included Module String delimiter by "/"
+    Dim PatternIndex_lng As Long               'Pattern index in PG_Info Structure
+
+    IsExist_bool = FindPatternIndex_Dct.Exists(LCase(PatternName_str))
+    If IsExist_bool = True Then
+        PatternIndex_lng = FindPatternIndex_Dct.Item(LCase(PatternName_str))
+        IncludeModule_Str = PG_Info.IncludeModule(PatternIndex_lng)
+        PG_Type_Str = PG_Info.PG_Type(PatternIndex_lng)
+    Else
+        errmsg = PatternName_str & "not exist in the dictionary, Please Check!"
+        GoTo errHandler
+    End If
+
+    If LCase(PG_Type_Str) <> "bypattern" Then
+        errmsg = PatternName_str & "is not byPattern type.Please check instance!"
+        GoTo errHandler
+    End If
+
+
+    If InStr(1, IncludeModule_Str, "/") > 0 Then
+        IncludeModuleList_Str = Split(IncludeModule_Str, "/")
+    Else
+        ReDim IncludeModuleList_Str(0)
+        IncludeModuleList_Str(0) = IncludeModule_Str
+    End If
+
+
+'*************************************************************************************************
+'*****Step2:Check if pin list in PG_Info Sheet exist in fail pin and update to dspwave******
+'*************************************************************************************************
+    Dim Local_DSPwave As New DSPWave               'Local dspwave to store PG data, can be used for AVS/NONE AVS case
+    Dim LoaclDspwaveWriteIndex_lng As Long
+    Dim j As Long
+    Dim i As Long
+    Dim EachModuleFail_Sbool As New SiteBoolean
+    Dim OtherPartFail_Sbool As New SiteBoolean
+    Dim FuncResult_SBool As New SiteBoolean
+
+    Local_DSPwave.CreateConstant -1, (glb_Module_Count + 2), DspLong
+
+'*************************************************************************************************
+'*****Step3:update PG Module result to local dspwave*******************
+'*************************************************************************************************
+    FuncResult_API_SBool = TheHdw.Digital.Patgen.PatternBurstPassedPerSite
+        For i = 0 To UBound(IncludeModuleList_Str)
+        If FindModuleIndex_Dct.Exists(LCase(IncludeModuleList_Str(i))) = True Then
+            'Get the reference order in Global dspwave by reference to the module name in the global const module string
+            LoaclDspwaveWriteIndex_lng = FindModuleIndex_Dct.Item(LCase(IncludeModuleList_Str(i)))
+                For Each Site In TheExec.Sites
+                    If FuncResult_API_SBool = False Then   '''Means this pattern fail for this site
+                        Local_DSPwave.Element(LoaclDspwaveWriteIndex_lng) = 0  'Update per module result to local Dspwave
+
+                    ElseIf FuncResult_API_SBool = True Then   '''Means this module pass for this site
+                        Local_DSPwave.Element(LoaclDspwaveWriteIndex_lng) = 1  'Update per module result to local Dspwave
+                    End If
+
+                Next Site
+        Else
+            errmsg = "Can not find " & LCase(IncludeModuleList_Str(i)) & "in user define module list,please check!"
+            GoTo errHandler
+        End If
+    Next i
+
+'*************************************************************************************************
+'*****Step3.1:Update Other Module result and test number to local dspwave*************************
+'*************************************************************************************************
+
+    For Each Site In TheExec.Sites
+
+        ''ByPattern case have not other part indeed, so set 1 in case of impact the result,default pass
+        Local_DSPwave.Element(glb_Module_Count) = 1  '''Update other part result to local Dspwave
+        Local_DSPwave.Element(glb_Module_Count + 1) = tempSortNumber_lng
+
+    Next Site
+
+
+'*************************************************************************************************
+'****Step3.2:Resotre Bin Number when first fail module appear*************************************
+'*************************************************************************************************
+    FuncResult_API_SBool = TheHdw.Digital.Patgen.PatternBurstPassedPerSite
+    For Each Site In TheExec.Sites
+        If glb_PGFirstFail_Flag_SBool = False Then    '''means PG Module haven't fail yet
+            If FuncResult_API_SBool = False Then ''means pattern failed,also module failed
+
+                glb_PGFirstFail_Flag_SBool = True
+                 glb_PGFisrtFail_SortNum_SLng = tempSortNumber_lng
+                 glb_PGFisrtFail_BinNum_SLng = Floor(tempSortNumber_lng / 1000)
+            End If
+        End If
+    Next Site
+
+''*************************************************************************************************
+''*****Step3.3:Judge Whether Bin Out Through PG Rules and Update Bin Number if needed**************
+''*************************************************************************************************
+'    Dim DSPModuleList_Str() As String
+'    Dim AVPModuleList_Str() As String
+'    Dim DSPSCluster_Count As Long
+'    Dim AVPSCluster_Count As Long
+'
+'    For Each Site In TheExec.Sites
+'        If TheExec.Sites(Site).FirstBinNumber = -1 And TheExec.Sites(Site).BinNumber = -1 and _
+'             TheExec.Sites(Site).FirstSortNumber = -1 And TheExec.Sites(Site).SortNumber = -1 Then
+'
+'                DSPModuleList_Str = Split(USER_DEFINE_DSPSCluster, "/")
+'                AVPModuleList_Str = Split(USER_DEFINE_AVPSCluster, "/")
+'                DSPSCluster_Count = UBound(DSPModuleList_Str) + 1
+'                AVPSCluster_Count = UBound(AVPModuleList_Str) + 1
+'                Dim LocalDSPS_Dspwave As New DSPWave
+'                Dim LocalAVPS_Dspwave As New DSPWave
+'
+'                LocalDSPS_Dspwave.CreateConstant -1, DSPSCluster_Count, DspLong
+'                LocalAVPS_Dspwave.CreateConstant -1, AVPSCluster_Count, DspLong
+'
+'                '''Update DSP and AVP Module Result to Their Dspwaves for PG bin out rule judge
+'                For i = 0 To DSPSCluster_Count - 1
+'                    If FindModuleIndex_Dct.Exists(LCase(DSPModuleList_Str(i))) = True Then
+'                    'Get the reference order in Global dspwave by reference to the module name in the global const module string
+'                        LoaclDspwaveWriteIndex_lng = FindModuleIndex_Dct.Item(LCase(DSPModuleList_Str(i)))
+'                        LocalDSPS_Dspwave.Element(i) = Local_DSPwave.Element(LoaclDspwaveWriteIndex_lng)
+'                    Else
+'                        errMsg = "Can not find this DSP module in user define module list,please check!"
+'                        GoTo errHandler
+'                    End If
+'                Next i
+'
+'                For i = 0 To AVPSCluster_Count - 1
+'                    If FindModuleIndex_Dct.Exists(LCase(AVPModuleList_Str(i))) = True Then
+'                    'Get the reference order in Global dspwave by reference to the module name in the global const module string
+'                        LoaclDspwaveWriteIndex_lng = FindModuleIndex_Dct.Item(LCase(AVPModuleList_Str(i)))
+'                        LocalAVPS_Dspwave.Element(i) = Local_DSPwave.Element(LoaclDspwaveWriteIndex_lng)
+'                    Else
+'                        errMsg = "Can not find this DSP module in user define module list,please check!"
+'                        GoTo errHandler
+'                    End If
+'                Next i
+'                If LocalDSPS_Dspwave.FindIndices(EqualTo, 0).SampleSize > 1 Or LocalAVPS_Dspwave.FindIndices(EqualTo, 0).SampleSize > 1 Or OtherPartFail_Sbool(Site) = True Then
+'                    TheExec.Sites(Site).BinNumber = glb_PGFisrtFail_BinNum_SLng
+'                    TheExec.Sites(Site).SortNumber = glb_PGFisrtFail_SortNum_SLng
+'                End If
+'            End If
+'        End If
+'    Next Site
+
+
+'*************************************************************************************************
+'*****Step3.4:Calculate cared module result for each PG test**************************************
+'*************************************************************************************************
+'''    For Each Site In TheExec.Sites
+'''        For i = 0 To UBound(IncludeModuleList_Str)
+'''            LoaclDspwaveWriteIndex_lng = FindModuleIndex_Dct.Item(LCase(IncludeModuleList_Str(i)))
+'''            If (FlowModuleFlag(FindModuleIndex_Dct.Item(LCase(IncludeModuleList_Str(i)))).iValue = 1) And (Local_DSPwave.Element(LoaclDspwaveWriteIndex_lng) = 1) Then
+'''                PGCaredModule_Result_SBool = PGCaredModule_Result_SBool And True ''Update CareModuleResult except for other part
+'''            ElseIf (FlowModuleFlag(FindModuleIndex_Dct.Item(LCase(IncludeModuleList_Str(i)))).iValue = 1) And (Local_DSPwave.Element(LoaclDspwaveWriteIndex_lng) = 0) Then
+'''                PGCaredModule_Result_SBool = PGCaredModule_Result_SBool And False ''Update CareModuleResult except for other part
+'''            End If
+'''        Next i
+'''    '''other part is always 1(pass) in byPattern case, so no need to consider
+'''
+'''    Next Site
+
+'*************************************************************************************************
+'*****Step3.5:Print Datalog and update global dspwave*********************************************
+'*************************************************************************************************
+    ''''''Log for Function Result and CaredModule Result
+    FuncResult_SBool = TheHdw.Digital.Patgen.PatternBurstPassedPerSite
+
+    Dim ModuleList_Str() As String
+    ModuleList_Str = Split(USER_DEFINE_MODULENAME, "/")
+    Dim tempDSPwave As New DSPWave
+    tempDSPwave.CreateConstant -1, (glb_Module_Count + 2), DspLong
+
+    'Pass each pattern result to global dspwave and judge pass fail for other part
+    For Each Site In TheExec.Sites
+        TheExec.Flow.TestLimit ResultVal:=FuncResult_SBool, lowVal:=-1, hiVal:=0, TName:="FuncResult"
+        'TheExec.Flow.TestLimit ResultVal:=PGCaredModule_Result_SBool, lowVal:=-1, hiVal:=0, TName:="CaredModuleResult"
+
+        If AVS_Enable = True Then   ''Print Local result of AVS PG result Dspwave
+            If AVS_LP_Enable_SBool = True Then  ''Print Local result of AVS LP PG result Dspwave
+                For i = 0 To UBound(ModuleList_Str)
+                    TheExec.Flow.TestLimit ResultVal:=Local_DSPwave.Element(i), lowVal:=-1, hiVal:=1, PinName:=ModuleList_Str(i), ForceResults:=tlForceNone, TName:="PG_Module_Part_Result_LP"
+                Next i
+                TheExec.Flow.TestLimit ResultVal:=Local_DSPwave.Element(glb_Module_Count), lowVal:=1, hiVal:=1, PinName:="Other", ForceResults:=tlForceNone, TName:="PG_Module_Part_Result_LP"
+                glb_PG_FlowResult_AVS_Dspwave = glb_PG_FlowResult_AVS_Dspwave.Concatenate(Local_DSPwave)
+                glb_PG_FlowResult_AVS_Dspwave = glb_PG_FlowResult_AVS_Dspwave.Concatenate(tempDSPwave)
+            ElseIf AVS_HP_Enable_SBool = True Then  ''Print Local result of AVS HP PG result Dspwave
+                For i = 0 To UBound(ModuleList_Str)
+                    TheExec.Flow.TestLimit ResultVal:=Local_DSPwave.Element(i), lowVal:=-1, hiVal:=1, PinName:=ModuleList_Str(i), ForceResults:=tlForceNone, TName:="PG_Module_Part_Result_HP"
+                Next i
+                TheExec.Flow.TestLimit ResultVal:=Local_DSPwave.Element(glb_Module_Count), lowVal:=1, hiVal:=1, PinName:="Other", ForceResults:=tlForceNone, TName:="PG_Module_Part_Result_HP"
+                Dim tempDSPwaveSampleSize As Long
+                tempDSPwaveSampleSize = glb_PG_FlowResult_AVS_Dspwave.SampleSize
+                glb_PG_FlowResult_AVS_Dspwave = glb_PG_FlowResult_AVS_Dspwave.Select(0, 1, tempDSPwaveSampleSize - glb_Module_Count - 2).Concatenate(Local_DSPwave)
+            End If
+        ElseIf AVS_Enable = False Then  ''Print Local result of normal PG result Dspwave
+            For i = 0 To UBound(ModuleList_Str)
+                TheExec.Flow.TestLimit ResultVal:=Local_DSPwave.Element(i), lowVal:=-1, hiVal:=1, PinName:=ModuleList_Str(i), ForceResults:=tlForceNone, TName:="PG_Module_Part_Result"
+            Next i
+            TheExec.Flow.TestLimit ResultVal:=Local_DSPwave.Element(glb_Module_Count), lowVal:=1, hiVal:=1, PinName:="Other", ForceResults:=tlForceNone, TName:="PG_Module_Part_Result"
+            glb_PG_FlowResult_Dspwave = glb_PG_FlowResult_Dspwave.Concatenate(Local_DSPwave)
+        End If
+    Next Site
+
+
+ 'Add debug mode to print pattern result for each site, for further use
+    If glb_PG_DebugMode = True Then
+        For Each Site In TheExec.Sites
+            FuncResult_SBool = TheHdw.Digital.Patgen.PatternBurstPassedPerSite
+            If FuncResult_SBool = False Then
+                TheExec.Datalog.WriteComment "Site:" & Site & "_" & PatternName_str & "_Pattern Fail for this site"
+            Else
+                TheExec.Datalog.WriteComment "Site:" & Site & "_" & PatternName_str & "_Pattern Pass for this site"
+            End If
+        Next Site
+    End If
+
+    Call PG_CalcModuleFailCountAfterDVS(Local_DSPwave, tempSortNumber_lng) '''add for CP DVS Flow bin number collect
+
+    Exit Function
+errHandler:
+    TheExec.ErrorLogMessage ("*E* PG.PostPatIPF: " + errmsg)
+    If AbortTest Then Exit Function Else Resume Next
+
+End Function
+Public Function PG_PrePatIPF_ByPattern(argc As Long, argv() As String) As Long
+    On Error GoTo errHandler
+
+    Dim i As Long
+    Dim PatternResult_SBOOL As New SiteBoolean
+
+    PatternResult_SBOOL = TheHdw.Digital.Patgen.PatternBurstPassedPerSite
+
+Exit Function
+errHandler:
+    TheExec.ErrorLogMessage ("*E* PG.PrePatIPF: " + errmsg)
+    If AbortTest Then Exit Function Else Resume Next
+End Function
+
+
+Public Function PG_PrePatIPF_ByCycle(argc As Long, argv() As String) As Long
+
+    On Error GoTo errHandler
+
+    If glb_IsPGInfoLoaded_Bool = False Then
+        Call Initialize_PG_Info
+        glb_IsPGInfoLoaded_Bool = True
+    End If
+
+    Dim i_LastBurst_str As String
+    Dim i_IsBurst_bool As Boolean
+    Dim Site As Variant
+    Dim errmsg As String
+
+    'Call TheHdw.Digital.Patgen.ReadLastStart(i_LastBurst_str, i_IsBurst_bool, "")
+
+    'CMEM Setup
+    'Max Capture Size 256K major cycles, CapturePassFailData, Set -1 to capture max size
+    'For dual mode, max capture size is 256K=256*1024*2=524288 cycle  (single mode 262144 cycle)
+
+    With TheHdw.Digital.CMEM
+        .SetCaptureConfig -1, CmemCaptFail, tlCMEMCaptureSourcePassFailData
+        .CentralFields = tlCMEMModCycle + tlCMEMPatternName
+    End With
+
+    Exit Function
+
+errHandler:
+    TheExec.ErrorLogMessage ("*E* PG.PrePatIPF: " + errmsg)
+    If AbortTest Then Exit Function Else Resume Next
+
+End Function
+
+
+Public Function PG_PostPatIPF_ByCycle(argc As Long, argv() As String) As Long
+    On Error GoTo errHandler
+
+'*************************************************************************************************
+'****Step0:Initialize parameter to use************************************************************
+'*************************************************************************************************
+    Dim i As Long
+    Dim errmsg As String
+    Dim tempSortNumber_lng As Long
+
+    '''inital PGCaredModule_Result value and Test number
+    For Each Site In TheExec.Sites
+        PGCaredModule_Result_SBool = True    '''inital PGCaredModule_Result value
+        tempSortNumber_lng = TheExec.Sites(Site).TestNumber / 10000
+    Next Site
+
+    Dim Local_DSPwave As New DSPWave               'Local dspwave to store PG data, can be used for AVS/NONE AVS case
+    Local_DSPwave.CreateConstant -1, (glb_Module_Count + 2), DspLong
+
+    Dim FuncResult_API_SBool As New SiteBoolean
+    Dim AllSitePass_Bool As Boolean
+
+    AllSitePass_Bool = True
+    FuncResult_API_SBool = TheHdw.Digital.Patgen.PatternBurstPassedPerSite
+    For Each Site In TheExec.Sites
+        AllSitePass_Bool = AllSitePass_Bool And FuncResult_API_SBool
+    Next Site
+
+    Dim NumCapt As Long
+    NumCapt = -9999
+    'For TTR, read captrued cycle need time,if all site pass then NumCapt should be zero
+    If AllSitePass_Bool = True Then
+        'If all site pass, then captrued cycle count should be 0, need check?
+        NumCapt = 0
+    Else
+        'Total cmem captured cycles, if numcapt means at least one site fail?
+        NumCapt = TheHdw.Digital.CMEM.CapturedCycles
+    End If
+    Dim ModuleList_Str() As String
+    ModuleList_Str = Split(USER_DEFINE_MODULENAME, "/")
+
+    Dim tempDSPwave As New DSPWave
+    tempDSPwave.CreateConstant -1, (glb_Module_Count + 2), DspLong
+
+    Dim i_LastBurst_str As String
+    Dim i_IsBurst_bool As Boolean
+    Call TheHdw.Digital.Patgen.ReadLastStart(i_LastBurst_str, i_IsBurst_bool, "")
+
+    'Fool proof, do not support .Pat and patset
+    If i_IsBurst_bool = True Then
+        errmsg = "ByCycle Partial Good Can Not Use Burst=Yes, Please check!"
+        GoTo errHandler
+    End If
+
+    If (LCase(Right(i_LastBurst_str, 4)) = ".pat") Or (LCase(Right(i_LastBurst_str, 6)) <> "module") Then
+        errmsg = "ByCycle Partial Good Can Not Use .PAT , Please check!"
+        GoTo errHandler
+    End If
+'*************************************************************************************************
+'*********Step1:Get Module Name List and find pattern in PG_Info Sheet****************************
+'*************************************************************************************************
+
+'''    'Skip read EndCyc and Name to save time, Names(0) should be the same with  TheHdw.Digital.Patgen.ReadLastStart
+'''    Dim EndCyc() As Long                '<- Array of ending cycle nums for each captured mod
+'''    Dim Names() As String               '<- Array of captured module names
+'''    TheHdw.Digital.CMEM.PatternName EndCyc, Names
+'''
+
+'''    'Only support one pattern when MBIST partial good test
+'''    If NumCapt <> 0 Then
+'''        If (UBound(Names) <> 0) Or (i_LastBurst_str <> Names(0)) Then
+'''            TheExec.AddOutput "Fail To Get Module Name,MBIST Partial Good Only Support One Pattern Each Run! Please Check!", vbRed
+'''
+'''            errMsg = "Fail To Get Module Name,MBIST Partial Good Only Support One Pattern Each Run! Please Check!"
+'''            GoTo errHandler
+'''        End If
+'''    End If
+
+    'Declaration
+    Dim wgl_Name_Str As String
+    Dim IsExist_bool As Boolean                'Check if pattern name exist in FindPatternIndex_Dct dictionary
+    Dim IncludeModule_Str As String            'Include Module String in excel work sheet
+    Dim IncludeModuleList_Str() As String      'Include Module String delimiter by "/"
+    Dim FailPinCycle_Str As String             'Fail Cycle String in excel work sheet
+    Dim FailPinCycleAarray_Str() As String     'Fail cycle String delimiter by "/", for each cared module
+    Dim PatternIndex_lng As Long               'Pattern index in PG_Info Structure
+    Dim PG_Type_Str As String
+
+    wgl_Name_Str = WGLName_Conversion(i_LastBurst_str)
+
+    IsExist_bool = FindPatternIndex_Dct.Exists(LCase(wgl_Name_Str))
+
+    If IsExist_bool = True Then
+        PatternIndex_lng = FindPatternIndex_Dct.Item(LCase(wgl_Name_Str))
+        PG_Type_Str = PG_Info.PG_Type(PatternIndex_lng)
+        IncludeModule_Str = PG_Info.IncludeModule(PatternIndex_lng)
+        FailPinCycle_Str = PG_Info.Pin_Cycle_Array(PatternIndex_lng)
+        IncludeModuleList_Str = Split(IncludeModule_Str, "/")
+        FailPinCycleAarray_Str = Split(FailPinCycle_Str, "/")
+
+        If UBound(IncludeModuleList_Str) <> UBound(FailPinCycleAarray_Str) Then
+            errmsg = "Module count not equal to fail cycle count, Please Check PG_Info Sheet!"
+            GoTo errHandler
+        End If
+
+        If LCase(PG_Type_Str) <> LCase("ByCycle") Then
+            errmsg = "PG Type Should Be ByCycle, Please Check PG_Info Sheet!"
+            GoTo errHandler
+        End If
+
+    Else
+        'Some patterns in MBIST pattern set may not exist in PG_Info table
+        If glb_PG_DebugMode = True Then
+            TheExec.Datalog.WriteComment wgl_Name_Str & " not exist in PG_Info Sheet,it will be tested in normal functional way,please check!"
+        End If
+
+        TheHdw.Digital.CMEM.SetCaptureConfig 0, CmemCaptNone
+        TheHdw.Digital.CMEM.CentralFields = tlCMEMNone
+
+        ''''if this pattern is not PG pattern ,then bin out when pattern fail
+        For Each Site In TheExec.Sites
+            If TheExec.Sites(Site).FirstSortNumber = -1 And TheExec.Sites(Site).FirstBinNumber = -1 And _
+                TheExec.Sites(Site).SortNumber = -1 And TheExec.Sites(Site).BinNumber = -1 Then
+                If FuncResult_API_SBool = False Then
+                    '''Bin Out Here
+                    TheExec.Sites(Site).BinNumber = Floor(tempSortNumber_lng / 1000)
+                    TheExec.Sites(Site).SortNumber = tempSortNumber_lng
+                    TheExec.Sites(Site).Result = tlResultFail
+                End If
+            End If
+        Next Site
+        Exit Function
+    End If
+
+'*************************************************************************************************
+'*********Step3:Get Fail Info*********************************************************************
+'*************************************************************************************************
+    'Dim i_pfType As PFType
+    Dim FuncResult_SBool As New SiteBoolean
+    Dim pdata As New PinListData, Pin As New PinData
+    Dim FailIndexList As New PinListData
+    FuncResult_SBool = False   'Add Init Value for FuncResult_SBool
+
+    'Total cmem captured cycles, if numcapt means at least one site fail?
+    'NumCapt = TheHdw.Digital.CMEM.CapturedCycles
+
+    'Return all captrued cycle number array in cmem
+    Dim CapturedCycleAry() As Double          '<- scratch double array
+    If NumCapt <> 0 Then
+        CapturedCycleAry = TheHdw.Digital.CMEM.PatGenInfo(tlCMEMModCycle, NumCapt)
+    End If
+
+    '___ Read the specified PLD data back from CMEM ________________________________________
+    '    PLD is site aware but uses dummy pin
+    '---------------------------------------------------------------------------------------
+
+'    Dim retData As New PinListData
+'
+'    If (retData.Pins.count = 0) Then
+'        retData.AddPin ("_FAKE_PG_")
+'    End If
+'
+'    'retData is site aware pinlistdata,each site has different value
+'    retData.Pins("_FAKE_PG_").Value = CapturedCycleAry
+
+    'Return all pass fail result for captrued cycle in cmem, 1 for fail, 0 for pass, VOH is compare level
+    'Set pdata = TheHdw.Digital.Pins(argv(0)).CMEM.Data(0, NumCapt)
+
+    'Return a pinlistdata include all fail cycle captured in CMEM, Note: All fail cycle, not all captured cycle
+    Dim FailIndexAry() As Long
+    If NumCapt <> 0 Then
+        Set FailIndexList = TheHdw.Digital.Pins(argv(0)).CMEM.FailIndexList(0, NumCapt)
+        'Add to store data in DSPWave
+        'Dim FailIndexDSPwave As New DSPWave
+    End If
+
+    'Use dictionary array to store fail cycle
+    Dim i_SiteFailCycle_DCT() As New Dictionary
+    ReDim i_SiteFailCycle_DCT(TheExec.Sites.Existing.Count - 1) As New Dictionary
+
+    'Put all fail cycle in dictionary,each fail cycle is a key, no need to care about item
+    For Each Site In TheExec.Sites
+        If NumCapt <> 0 Then
+            If UBound(FailIndexList.Pins(argv(0)).Value(Site)) = -1 Then
+                FuncResult_SBool = True    ''means this site pass for this pattern
+            Else
+                FuncResult_SBool = False   ''means this site fail for this pattern
+                FailIndexAry = FailIndexList.Pins(argv(0)).Value(Site)
+                For i = 0 To UBound(FailIndexAry)
+                    'Use index in FailIndexList to reference in retData PLD, FailIndexList store fail index for capture data
+                    'i_SiteFailCycle_DCT(Site).add CStr(retData.Pins("_FAKE_PG_").Value(Site)(FailIndexList.Pins(argv(0)).Value(Site)(i))), True
+                    'i_SiteFailCycle_DCT(Site).add CStr(CapCycleDSPwave(Site).Element(FailIndexDSPwave(Site).Element(i))), True
+                    i_SiteFailCycle_DCT(Site).add CStr(CapturedCycleAry(FailIndexAry(i))), True
+                Next i
+            End If
+            'For debug use
+            'Print_Dictionary i_SiteFailCycle_DCT(Site)
+        Else
+            FuncResult_SBool = True
+        End If
+    Next Site
+
+'*****************************************************************************************************************
+'*****Step4:Check if cycle number in PG_Info Sheet exist in fail cycle and calc PG/Other/Cared Module Result******
+'*****************************************************************************************************************
+
+    Dim IncludeModuleCount_lng As Long
+    Dim EachModuleFailCycleAry_Str() As String        'Fail cycle String for each Include module in PG_Info Sheet, delimiter by ","
+    Dim LoaclDspwaveWriteIndex_lng As Long         'Write index for each module in loacal dspwave, reference to USER_DEFINE_MODULENAME
+    Dim j As Long
+    Dim EachModuleFail_Sbool As New SiteBoolean
+    Dim OtherPartFail_Sbool As New SiteBoolean
+
+    'Add Init Value As Pattern Fail
+    EachModuleFail_Sbool = True
+    OtherPartFail_Sbool = True
+
+    IncludeModuleCount_lng = UBound(IncludeModuleList_Str) + 1
+
+'*************************************************************************************************
+'*****Step4.1:Search result in DCT,and update PG Module result to local dspwave*******************
+'*************************************************************************************************
+    For i = 0 To UBound(IncludeModuleList_Str)
+        EachModuleFail_Sbool = False  'Assume all module pass
+        'For Each Module Search
+        If FindModuleIndex_Dct.Exists(LCase(IncludeModuleList_Str(i))) = True Then
+            'Get the reference order in Global dspwave by reference to the module name in the global const module string
+            LoaclDspwaveWriteIndex_lng = FindModuleIndex_Dct.Item(LCase(IncludeModuleList_Str(i)))
+            'Get fail cycle for each module, delimiter by ","
+            EachModuleFailCycleAry_Str = Split(FailPinCycleAarray_Str(i), ",")
+
+            For Each Site In TheExec.Sites
+                'For TTR,if this pattern pass, then no need to search for DCT, this module pass
+                If FuncResult_SBool = True Then
+                    EachModuleFail_Sbool = False   'This module pass
+                Else
+                    For j = 0 To UBound(EachModuleFailCycleAry_Str)
+                        If i_SiteFailCycle_DCT(Site).Exists(EachModuleFailCycleAry_Str(j)) Then
+                            i_SiteFailCycle_DCT(Site).Remove (EachModuleFailCycleAry_Str(j))
+                            'Debug.Print i_SiteFailCycle_DCT(Site).count
+                            EachModuleFail_Sbool = True  'This module fail
+                        End If
+                    Next j
+                End If
+
+                If EachModuleFail_Sbool = True Then      'Means this module fail for this site
+                    Local_DSPwave.Element(LoaclDspwaveWriteIndex_lng) = 0   'Update per module result to local Dspwave
+                Else                                      'Means pattern pass for this site
+                    Local_DSPwave.Element(LoaclDspwaveWriteIndex_lng) = 1   'Update per module result to local Dspwave
+                End If
+            Next Site
+        Else
+            errmsg = "Can not find " & LCase(IncludeModuleList_Str(i)) & "in user define module list,please check!"
+            GoTo errHandler
+        End If
+    Next i
+
+'*************************************************************************************************
+'*****Step4.2:Update Other Module result and test number to local dspwave*************************
+'*************************************************************************************************
+
+    'Update other part and testnumber
+    For Each Site In TheExec.Sites
+        Local_DSPwave.Element(glb_Module_Count + 1) = tempSortNumber_lng
+
+        If FuncResult_SBool = True Then                                        'This Site pattern pass, so other part also pass, give dspwave element other a "1" for pass
+            OtherPartFail_Sbool = False
+            Local_DSPwave.Element(glb_Module_Count) = 1                        'Update other part result to local Dspwave
+        Else
+            If i_SiteFailCycle_DCT(Site).Count = 0 Then                        'No fail cycle except cared cycle in PG_Info Sheet, means other part pass
+                OtherPartFail_Sbool = False
+                Local_DSPwave.Element(glb_Module_Count) = 1                    'Update other part result to local Dspwave
+            Else                                                               'Other cycle fail except cared cycle in PG_Info Sheet, means other part fail
+                OtherPartFail_Sbool = True
+                Local_DSPwave.Element(glb_Module_Count) = 0                    'Update other part result to local Dspwave
+
+                '''if None-AVS other part fail,should bin out here
+                If AVS_Enable = False Then
+                    TheExec.Sites(Site).BinNumber = Floor(tempSortNumber_lng / 1000)
+                    TheExec.Sites(Site).SortNumber = tempSortNumber_lng
+                    TheExec.Sites(Site).Result = tlResultFail
+                End If
+
+            End If
+        End If
+    Next Site
+
+'*************************************************************************************************
+'****Step4.3:Resotre Bin Number when first fail module appear*************************************
+'*************************************************************************************************
+    For Each Site In TheExec.Sites
+        If glb_PGFirstFail_Flag_SBool = False Then    '''means PG Module haven't fail yet
+            If Local_DSPwave.Select(0, 1, glb_Module_Count + 1).FindIndices(EqualTo, 0).SampleSize > 0 Then      ''means more than one module failed
+                If FuncResult_API_SBool = False Then        ''double check if pattern failed
+                    glb_PGFirstFail_Flag_SBool = True
+                    glb_PGFisrtFail_SortNum_SLng = tempSortNumber_lng
+                    glb_PGFisrtFail_BinNum_SLng = Floor(tempSortNumber_lng / 1000)
+                Else
+                    errmsg = "Warning!!The pattern is supposed to fail here but API result is pass!Need to Check Code"
+                    GoTo errHandler
+                End If
+            End If
+        End If
+    Next Site
+
+'*************************************************************************************************
+'*****Step4.4:Calculate cared module result for each PG test**************************************
+'*************************************************************************************************
+'''    Dim EmptyPGCount_slng As New SiteLong  'Use to fool proof, when all include module in FlowModuleFlag result is false, find this case and modify PGCaredModule result as False
+'''    EmptyPGCount_slng = 0
+'''    For Each Site In TheExec.Sites
+'''        For i = 0 To UBound(IncludeModuleList_Str)
+'''            LoaclDspwaveWriteIndex_lng = FindModuleIndex_Dct.Item(LCase(IncludeModuleList_Str(i)))
+'''            'Only Update CaredModule Result when this module pass in FlowModuleFlag, need to verify
+'''
+'''            If (FlowModuleFlag(FindModuleIndex_Dct.Item(LCase(IncludeModuleList_Str(i)))).iValue = 1) And (Local_DSPwave.Element(LoaclDspwaveWriteIndex_lng) = 1) Then
+'''                'If FlowModuleFlag pass and loacl module result pass
+'''                PGCaredModule_Result_SBool = PGCaredModule_Result_SBool And True ''Update CareModuleResult except for other part
+'''            ElseIf (FlowModuleFlag(FindModuleIndex_Dct.Item(LCase(IncludeModuleList_Str(i)))).iValue = 1) And (Local_DSPwave.Element(LoaclDspwaveWriteIndex_lng) = 0) Then
+'''                'If FlowModuleFlag pass and loacl module result fail
+'''                PGCaredModule_Result_SBool = PGCaredModule_Result_SBool And False ''Update CareModuleResult except for other part
+'''            ElseIf FlowModuleFlag(FindModuleIndex_Dct.Item(LCase(IncludeModuleList_Str(i)))).iValue = 0 Then
+'''                EmptyPGCount_slng = EmptyPGCount_slng + 1
+'''            End If
+'''        Next i
+'''
+'''        If OtherPartFail_Sbool = True Then
+'''            'Means other part fail
+'''            PGCaredModule_Result_SBool = PGCaredModule_Result_SBool And False ''Update CareModuleResult for other part
+'''        Else
+'''            'Means other part pass
+'''            PGCaredModule_Result_SBool = PGCaredModule_Result_SBool And True ''Update CareModuleResult for other part
+'''        End If
+'''
+'''        If EmptyPGCount_slng = UBound(IncludeModuleList_Str) + 1 Then
+'''            'Fool Proof, Means all include module result in FlowModuleFlag is false, need to modify PGCaredModule result as False
+'''            PGCaredModule_Result_SBool = False
+'''        End If
+'''    Next Site
+
+
+
+
+''''*************************************************************************************************
+'*****Step5:Print Datalog and update global dspwave*********************************************
+'*************************************************************************************************
+
+    'Clear CMEM setup for next use
+    TheHdw.Digital.CMEM.SetCaptureConfig 0, CmemCaptNone
+    TheHdw.Digital.CMEM.CentralFields = tlCMEMNone
+
+    ''''''Log for Function Result and CaredModule Result
+    'For by cycle test, already get funcresult for each site through fail cycle count
+'    Dim FuncResult_API_SBool As New SiteBoolean
+'    FuncResult_API_SBool = TheHdw.Digital.Patgen.PatternBurstPassedPerSite
+    For Each Site In TheExec.Sites
+        If FuncResult_SBool <> FuncResult_API_SBool Then
+            errmsg = "Site " & CStr(Site) & " Function result not correlation, Please Check!"
+            GoTo errHandler
+        End If
+    Next Site
+
+    'Pass each pattern result to global dspwave and judge pass fail for other part
+    For Each Site In TheExec.Sites
+        'TheExec.Flow.TestLimit ResultVal:=i_LastBurst_str, TName:="Pattern Name"
+        TheExec.Flow.TestLimit ResultVal:=FuncResult_API_SBool, lowVal:=-1, hiVal:=0, TName:="FuncResult"
+        'TheExec.Flow.TestLimit ResultVal:=PGCaredModule_Result_SBool, lowVal:=-1, hiVal:=0, TName:="CaredModuleResult"
+
+        If AVS_Enable = True Then  ''Print Local result of AVS PG result Dspwave
+            If AVS_LP_Enable_SBool = True Then     ''Print Local result of AVS LP PG result Dspwave
+                For i = 0 To UBound(ModuleList_Str)
+                    TheExec.Flow.TestLimit ResultVal:=Local_DSPwave.Element(i), lowVal:=-1, hiVal:=1, PinName:=ModuleList_Str(i), ForceResults:=tlForceNone, TName:="PG_Module_Part_Result_LP"
+                Next i
+                TheExec.Flow.TestLimit ResultVal:=Local_DSPwave.Element(glb_Module_Count), lowVal:=1, hiVal:=1, PinName:="Other", ForceResults:=tlForceNone, TName:="PG_Module_Part_Result_LP"
+                glb_PG_FlowResult_AVS_Dspwave = glb_PG_FlowResult_AVS_Dspwave.Concatenate(Local_DSPwave)
+                glb_PG_FlowResult_AVS_Dspwave = glb_PG_FlowResult_AVS_Dspwave.Concatenate(tempDSPwave)
+            ElseIf AVS_HP_Enable_SBool = True Then     ''Print Local result of AVS HP PG result Dspwave
+                For i = 0 To UBound(ModuleList_Str)
+                    TheExec.Flow.TestLimit ResultVal:=Local_DSPwave.Element(i), lowVal:=-1, hiVal:=1, PinName:=ModuleList_Str(i), ForceResults:=tlForceNone, TName:="PG_Module_Part_Result_HP"
+                Next i
+                TheExec.Flow.TestLimit ResultVal:=Local_DSPwave.Element(glb_Module_Count), lowVal:=1, hiVal:=1, PinName:="Other", ForceResults:=tlForceNone, TName:="PG_Module_Part_Result_HP"
+                Dim tempDSPwaveSampleSize As Long
+                tempDSPwaveSampleSize = glb_PG_FlowResult_AVS_Dspwave.SampleSize
+                glb_PG_FlowResult_AVS_Dspwave = glb_PG_FlowResult_AVS_Dspwave.Select(0, 1, tempDSPwaveSampleSize - glb_Module_Count - 2).Concatenate(Local_DSPwave)
+            End If
+        ElseIf AVS_Enable = False Then     ''Print Local result of normal PG result Dspwave
+            For i = 0 To UBound(ModuleList_Str)
+                TheExec.Flow.TestLimit ResultVal:=Local_DSPwave.Element(i), lowVal:=-1, hiVal:=1, PinName:=ModuleList_Str(i), ForceResults:=tlForceNone, TName:="PG_Module_Part_Result"
+            Next i
+            TheExec.Flow.TestLimit ResultVal:=Local_DSPwave.Element(glb_Module_Count), lowVal:=1, hiVal:=1, PinName:="Other", ForceResults:=tlForceNone, TName:="PG_Module_Part_Result"
+            glb_PG_FlowResult_Dspwave = glb_PG_FlowResult_Dspwave.Concatenate(Local_DSPwave)
+        End If
+    Next Site
+
+    'Add debug mode to print all fail cycle for each site, for further use
+    If glb_PG_DebugMode = True Then
+        For Each Site In TheExec.Sites
+            TheExec.Datalog.WriteComment "Pattern Module Name: " & i_LastBurst_str & Chr(13)
+            If FuncResult_SBool = True Then
+                'For pattern pass site
+                TheExec.Datalog.WriteComment "Site " & CStr(Site) & " pattern pass!"
+            Else
+                'For pattern fail site, store all fail cycle in PG_ByCycle_Print_Str, delimiter by ","
+                FailIndexAry = FailIndexList.Pins(argv(0)).Value(Site)
+                For i = 0 To UBound(FailIndexAry)
+                    TheExec.Datalog.WriteComment "Site " & CStr(Site) & " Fail Cycle is: " & CStr(CapturedCycleAry(FailIndexAry(i))) & Chr(13)
+                Next i
+            End If
+        Next Site
+    End If
+
+
+    Call PG_CalcModuleFailCountAfterDVS(Local_DSPwave, tempSortNumber_lng) '''add for CP DVS Flow bin number collect
+
+    Exit Function
+
+errHandler:
+
+    'Clear CMEM setup for next use
+    TheHdw.Digital.CMEM.SetCaptureConfig 0, CmemCaptNone
+    TheHdw.Digital.CMEM.CentralFields = tlCMEMNone
+
+    TheExec.ErrorLogMessage ("*E* PG.PostPatIPF: " + errmsg)
+    If AbortTest Then Exit Function Else Resume Next
+
+End Function
+Public Function Print_Dictionary(InputDict As Dictionary) As Long()
+    On Error GoTo errHandler
+    Dim Key As Variant
+    For Each Key In InputDict.Keys
+        Debug.Print Key, InputDict(Key)
+    Next Key
+
+    Exit Function
+errHandler:
+    If AbortTest Then Exit Function Else Resume Next
+End Function
+
+
+Public Function WGLName_Conversion(InputPatternModuleName As String) As String
+
+    On Error GoTo errHandler
+
+    Dim WGL_Name As String
+    Dim Tokens() As String
+    Dim i As Long
+
+    Tokens = Split(InputPatternModuleName, "_")
+    WGL_Name = Tokens(0)
+    For i = 1 To UBound(Tokens) - 4
+        WGL_Name = WGL_Name + "_" + Tokens(i)
+    Next
+
+    WGL_Name = WGL_Name + ".wgl"
+
+    WGLName_Conversion = WGL_Name
+    'Debug.Print WGLName_Conversion
+
+    Exit Function
+
+'___ Error handlers _____________________________________________________________________
+errHandler:
+    TheExec.ErrorLogMessage ("*E* PG: Error when conversion pattern module name to wgl name!")
+    If AbortTest Then Exit Function Else Resume Next
+
+End Function
+
+Public Function WGLName_Conversion_CHAIN(InputPatternModuleName As String) As String
+
+    On Error GoTo errHandler
+
+    Dim WGL_Name As String
+    Dim Tokens() As String
+    Dim i As Long
+
+    Tokens = Split(InputPatternModuleName, "_")
+    WGL_Name = Tokens(0)
+    For i = 1 To UBound(Tokens) - 4
+        WGL_Name = WGL_Name + "_" + Tokens(i)
+    Next
+
+    WGL_Name = WGL_Name + ".wgl"
+
+    WGLName_Conversion_CHAIN = WGL_Name
+    'Debug.Print WGLName_Conversion
+
+    Exit Function
+
+'___ Error handlers _____________________________________________________________________
+errHandler:
+    TheExec.ErrorLogMessage ("*E* PG: Error when conversion pattern module name to wgl name!")
+    If AbortTest Then Exit Function Else Resume Next
+
+End Function
